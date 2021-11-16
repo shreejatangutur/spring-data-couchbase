@@ -90,13 +90,4 @@ public class CollectionAwareIntegrationTests extends JavaIntegrationTests {
 		reactiveCouchbaseTemplate = (ReactiveCouchbaseTemplate) ac.getBean(REACTIVE_COUCHBASE_TEMPLATE);
 	}
 
-	@AfterAll
-	public static void afterAll() {
-		Config.setScopeName(null);
-		ApplicationContext ac = new AnnotationConfigApplicationContext(Config.class);
-		// the Config class has been modified, these need to be loaded again
-		couchbaseTemplate = (CouchbaseTemplate) ac.getBean(COUCHBASE_TEMPLATE);
-		reactiveCouchbaseTemplate = (ReactiveCouchbaseTemplate) ac.getBean(REACTIVE_COUCHBASE_TEMPLATE);
-		callSuperAfterAll(new Object() {});
-	}
 }
