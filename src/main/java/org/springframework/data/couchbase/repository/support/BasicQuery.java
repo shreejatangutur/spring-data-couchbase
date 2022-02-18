@@ -50,7 +50,9 @@ public class BasicQuery extends Query {
 	}
 
 	public BasicQuery(QueryCriteriaDefinition criteria, Map<String, String> projectionFields) {
-		addCriteria(criteria);
+		if(criteria != null){
+			addCriteria(criteria);
+		}
 		this.projectionFields = projectionFields;
 	}
 

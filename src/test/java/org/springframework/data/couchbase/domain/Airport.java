@@ -41,18 +41,24 @@ public class Airport extends ComparableEntity {
 
 	String icao;
 
+	String homeOfAirlineId;
+
 	@Version Number version;
 
 	@CreatedBy private String createdBy;
 	@Expiration private long expiration;
-	@Max(2)
-	long size;
+	@Max(2) long size;
 
 	@PersistenceConstructor
 	public Airport(String key, String iata, String icao) {
+		this(key, iata, icao, null);
+	}
+
+	public Airport(String key, String iata, String icao, String homeOfAirlineId) {
 		this.key = key;
 		this.iata = iata;
 		this.icao = icao;
+		this.homeOfAirlineId = homeOfAirlineId;
 	}
 
 	public String getId() {
@@ -72,15 +78,19 @@ public class Airport extends ComparableEntity {
 	}
 
 	public Airport withId(String id) {
-		return new Airport(id, this.iata, this.icao);
+		return new Airport(id, this.iata, this.icao, this.homeOfAirlineId);
+	}
+
+	public Airport withHomeOfAirline(String  homeOfAirlineId) {
+		return new Airport(this.getId(), this.iata, this.icao, homeOfAirlineId);
 	}
 
 	public Airport withIcao(String icao) {
-		return new Airport(this.getId(), this.iata, icao);
+		return new Airport(this.getId(), this.iata, icao, this.homeOfAirlineId);
 	}
 
 	public Airport withIata(String iata) {
-		return new Airport(this.getId(), iata, this.icao);
+		return new Airport(this.getId(), iata, this.icao, this.homeOfAirlineId);
 	}
 
 	public Airport clearVersion() {
@@ -92,11 +102,11 @@ public class Airport extends ComparableEntity {
 		return createdBy;
 	}
 
-	public long getSize(){
+	public long getSize() {
 		return size;
 	}
 
-	public void setSize(long size){
+	public void setSize(long size) {
 		this.size = size;
 	}
 }

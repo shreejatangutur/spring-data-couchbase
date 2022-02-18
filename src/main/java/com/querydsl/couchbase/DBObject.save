@@ -1,0 +1,14 @@
+//
+// Source code recreated from a .class file by IntelliJ IDEA
+// (powered by FernFlower decompiler)
+//
+
+package com.querydsl.couchbase;
+
+import org.springframework.data.couchbase.core.mapping.CouchbaseStorable;
+
+public interface DBObject extends CouchbaseStorable {
+  void markAsPartialObject();
+
+  boolean isPartialObject();
+}

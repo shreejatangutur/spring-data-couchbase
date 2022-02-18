@@ -21,6 +21,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import com.querydsl.core.types.dsl.CollectionPathBase;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.data.couchbase.core.mapping.CouchbaseDocument;
 import org.springframework.data.couchbase.core.query.QueryCriteriaDefinition;
@@ -47,12 +48,11 @@ import com.querydsl.core.types.Predicate;
  * @author Michael Reiche
  */
 
-public abstract class AbstractCouchbaseQueryDSL<Q extends AbstractCouchbaseQueryDSL<Q>> implements SimpleQuery<Q> {
+public abstract class AbstractCouchbaseQuery<Q extends AbstractCouchbaseQuery<Q>> implements SimpleQuery<Q> {
 	private final CouchbaseDocumentSerializer serializer;
 	private final QueryMixin<Q> queryMixin;// = new QueryMixin(this, new DefaultQueryMetadata(), false);
-	// TODO private ReadPreference readPreference;
 
-	public AbstractCouchbaseQueryDSL(CouchbaseDocumentSerializer serializer) {
+	public AbstractCouchbaseQuery(CouchbaseDocumentSerializer serializer) {
 		this.serializer = serializer;
 		@SuppressWarnings("unchecked") // Q is this plus subclass
 		Q query = (Q) this;
@@ -60,30 +60,26 @@ public abstract class AbstractCouchbaseQueryDSL<Q extends AbstractCouchbaseQuery
 	}
 
 	/**
-	 * mongodb uses createQuery(Predicate filter) where the serializer creates the 'query' <br>
-	 * and then uses the result to create a BasicQuery with queryObject = result <br>
 	 * Couchbase Query has a 'criteria' which is a <br>
 	 * List<QueryCriteriaDefinition> criteria <br>
 	 * so we could create a List&lt;QueryCriteriaDefinition&gt; or an uber QueryCriteria that combines <br>
 	 * all the sub QueryDefinitions in the filter.
 	 */
 	protected QueryCriteriaDefinition createCriteria(Predicate predicate) {
-		// mongodb uses createQuery(Predicate filter) where the serializer creates the 'queryObject' of the BasicQuery
 		return predicate != null ? (QueryCriteriaDefinition) this.serializer.handle(predicate) : null;
 	}
 
-	// TODO - need later
-	// public <T> JoinBuilder<Q, T> join(Path<T> ref, Path<T> target) {
-	// return new JoinBuilder(this.queryMixin, ref, target);
-	// }
+	public <T> JoinBuilder<Q, T> join(Path<T> ref, Path<T> target) {
+		return new JoinBuilder(this.queryMixin, ref, target);
+	}
 
-	// public <T> JoinBuilder<Q, T> join(CollectionPathBase<?, T, ?> ref, Path<T> target) {
-	// return new JoinBuilder(this.queryMixin, ref, target);
-	// }
+	public <T> JoinBuilder<Q, T> join(CollectionPathBase<?, T, ?> ref, Path<T> target) {
+		return new JoinBuilder(this.queryMixin, ref, target);
+	}
 
-	// public <T> AnyEmbeddedBuilder<Q> anyEmbedded(Path<? extends Collection<T>> collection, Path<T> target) {
-	// return new AnyEmbeddedBuilder(this.queryMixin, collection);
-	// }
+	 public <T> AnyEmbeddedBuilder<Q> anyEmbedded(Path<? extends Collection<T>> collection, Path<T> target) {
+	 return new AnyEmbeddedBuilder(this.queryMixin, collection);
+	 }
 
 	@Nullable
 	protected Predicate createFilter(QueryMetadata metadata) {
@@ -107,12 +103,13 @@ public abstract class AbstractCouchbaseQueryDSL<Q extends AbstractCouchbaseQuery
 			Path<?> target = (Path) ((Operation) join.getTarget()).getArg(1);
 			Predicate extraFilters = (Predicate) predicates.get(target.getRoot());
 			Predicate filter = ExpressionUtils.allOf(new Predicate[] { join.getCondition(), extraFilters });
-			List<? extends Object> ids = this.getIds(target.getType(), filter);
+			List<? extends Object> ids = this.getIds(source, target, filter);
 			if (ids.isEmpty()) {
-				throw new AbstractCouchbaseQueryDSL.NoResults();
+				throw new AbstractCouchbaseQuery.NoResults();
 			}
 
-			Path<?> path = ExpressionUtils.path(String.class, source, "$id");
+			Path<?> path = ExpressionUtils.path(String.class, source, "id");
+			path = ExpressionUtils.path(String.class, "meta().id");
 			predicates.merge(source.getRoot(),
 					ExpressionUtils.in(path, (Collection) ids/* TODO was just ids without casting to Collection */),
 					ExpressionUtils::and);
@@ -126,7 +123,10 @@ public abstract class AbstractCouchbaseQueryDSL<Q extends AbstractCouchbaseQuery
 		return predicates != null ? ExpressionUtils.allOf(predicates) : null;
 	}
 
-	protected abstract List<Object> getIds(Class<?> var1, Predicate var2);
+	//protected abstract List<Object> getIds(Class<?> var1, Predicate var2);
+
+	protected abstract List<Object> getIds(Path<?> source, Path<?> target, Predicate var2);
+
 
 	public Q distinct() {
 		return this.queryMixin.distinct();
@@ -182,12 +182,8 @@ public abstract class AbstractCouchbaseQueryDSL<Q extends AbstractCouchbaseQuery
 	}
 
 	protected CouchbaseDocument createQuery(@Nullable Predicate predicate) {
-		return predicate != null ? (CouchbaseDocument) this.serializer.handle(predicate) : new CouchbaseDocument();
+		return predicate != null ? new CouchbaseDocument(this.serializer.handle(predicate).toString()) : new CouchbaseDocument();
 	}
-
-	// public void setReadPreference(ReadPreference readPreference) {
-	// this.readPreference = readPreference;
-	// }
 
 	protected QueryMixin<Q> getQueryMixin() {
 		return this.queryMixin;
@@ -196,10 +192,6 @@ public abstract class AbstractCouchbaseQueryDSL<Q extends AbstractCouchbaseQuery
 	protected CouchbaseDocumentSerializer getSerializer() {
 		return this.serializer;
 	}
-
-	// protected ReadPreference getReadPreference() {
-	// return this.readPreference;
-	// }
 
 	public CouchbaseDocument asDocument() {
 		return this.createQuery(this.queryMixin.getMetadata().getWhere());

@@ -16,11 +16,11 @@
 package org.springframework.data.couchbase.repository.support;
 
 /**
- * DB references
+ * Document references
  *
  * @author Michael Reiche
  */
-public class DBRef {
+public class DocRef {
 	Object id;
 
 	public Object getId() {

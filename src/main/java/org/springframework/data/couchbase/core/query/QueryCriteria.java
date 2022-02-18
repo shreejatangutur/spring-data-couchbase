@@ -23,11 +23,12 @@ import java.util.Formatter;
 import java.util.LinkedList;
 import java.util.List;
 
-import com.couchbase.client.core.error.CouchbaseException;
+import com.mysema.commons.lang.Assert;
 import org.springframework.data.couchbase.core.convert.CouchbaseConverter;
 import org.springframework.lang.Nullable;
 import org.springframework.util.CollectionUtils;
 
+import com.couchbase.client.core.error.CouchbaseException;
 import com.couchbase.client.core.error.InvalidArgumentException;
 import com.couchbase.client.java.json.JsonArray;
 import com.couchbase.client.java.json.JsonObject;
@@ -69,7 +70,6 @@ public class QueryCriteria implements QueryCriteriaDefinition {
 		this.criteriaChain.add(this);// add the new one to the chain. The new one has the chainOperator set
 		this.key = key;
 		this.value = value;
-		// this.chainOperator = chainOperator; ignored now.
 		this.operator = operator;
 		this.format = format;
 	}
@@ -88,47 +88,41 @@ public class QueryCriteria implements QueryCriteriaDefinition {
 		return new QueryCriteria(null, key, null, null);
 	}
 
-	// wrap criteria (including the criteriaChain) in a new QueryCriteria and set the queryChain of the original criteria
-	// to just itself. The new query will be the value[0] of the original query.
+	/**
+	 * Similar to wrap(), except that 'this' is being modified instead of the criteria argument. Used in size() and
+	 * negate().
+	 */
 	private void replaceThisAsWrapperOf(QueryCriteria criteria) {
 		QueryCriteria qc = new QueryCriteria(criteria.criteriaChain, criteria.key, criteria.value, criteria.chainOperator,
 				criteria.operator, criteria.format);
 		criteriaChain.remove(criteria); // we replaced it with the clone
+		// location in the chain is not important as this is used only for criteria with a single criteria in the chain
 		criteriaChain = new LinkedList<>();
 		criteriaChain.add(this);
+		// make this a wrapper of the clone
 		key = N1QLExpression.WRAPPER();
 		operator = "";
 		value = new Object[] { qc };
 		chainOperator = null;
 	}
 
-	// wrap criteria (including the criteriaChain) in a new QueryCriteria and set the queryChain of the original criteria
-	// to just itself. The new query will be the value[0] of the original query.
-	private void wrapThis() {
-		QueryCriteria qc = new QueryCriteria(this.criteriaChain, this.key, this.value, this.chainOperator, this.operator,
-				this.format);
-		this.criteriaChain.remove(this); // we replaced it with the clone
-		this.criteriaChain = new LinkedList<>();
-		this.criteriaChain.add(this);
-		this.key = N1QLExpression.WRAPPER();
-		this.operator = "";
-		this.format = null;
-		this.value = new Object[] { qc };
-		this.chainOperator = null;
-
-	}
-
-	// wrap criteria (including the criteriaChain) in a new QueryCriteria and set the queryChain of the original criteria
-	// to just itself. The new query will be the value[0] of the original query.
+	/**
+	 * This is used twice for and() and or(). The criteria is cloned, the clone which was added to its chain on creation
+	 * is removed, then added in the same location as the original, then the original is removed its own chain. Then the
+	 * original is given an newly initialized chain with just itself. The original criteria is turned into a wrapper of
+	 * the clone. The cloned criteria will be the value[0] of the original criteria.
+	 */
 	private static QueryCriteria wrap(QueryCriteria criteria) {
 		QueryCriteria qc = new QueryCriteria(criteria.criteriaChain, criteria.key, criteria.value, criteria.chainOperator,
 				criteria.operator, criteria.format);
 		criteria.criteriaChain.remove(qc);
+		// this insures that the cloned query ends up in the correct place in the chain
 		int idx = criteria.criteriaChain.indexOf(criteria);
 		criteria.criteriaChain.add(idx, qc);
 		criteria.criteriaChain.remove(criteria); // we replaced it with the clone
 		criteria.criteriaChain = new LinkedList<>();
 		criteria.criteriaChain.add(criteria);
+		// make this a wrapper of the clone
 		criteria.key = N1QLExpression.WRAPPER();
 		criteria.operator = "";
 		criteria.format = null;
@@ -142,14 +136,12 @@ public class QueryCriteria implements QueryCriteriaDefinition {
 	}
 
 	public QueryCriteria and(N1QLExpression key) {
-		// this.criteriaChain.getLast().setChainOperator(ChainOperator.AND);
 		return new QueryCriteria(this.criteriaChain, key, null, ChainOperator.AND);
 	}
 
 	public QueryCriteria and(QueryCriteria criteria) {
-		if (this.criteriaChain != null && !this.criteriaChain.contains(this)) {
-			throw new RuntimeException("criteria chain does not include this");
-		}
+		Assert.isFalse(this.criteriaChain != null && !this.criteriaChain.contains(this),
+				"criteria chain does not include this");
 		if (this.criteriaChain == null) {
 			this.criteriaChain = new LinkedList<>();
 			this.criteriaChain.add(this);
@@ -158,11 +150,13 @@ public class QueryCriteria implements QueryCriteriaDefinition {
 		QueryCriteria qc = wrap(criteria);
 		newThis.criteriaChain.add(qc);
 		qc.setChainOperator(ChainOperator.AND);
-		newThis.chainOperator = ChainOperator.AND;//  otherwise we get "A chain operator must be present when chaining"
+		newThis.chainOperator = ChainOperator.AND;// otherwise we get "A chain operator must be present when chaining"
 		return newThis;
 	}
 
-	// upper and lower should work like and/or by pushing "this" to a 'value' and changing "this" to upper()/lower()
+	/**
+	 * upper and lower should work like and/or by pushing "this" to a 'value' and changing "this" to upper()/lower()
+	 */
 	public QueryCriteria upper() {
 		key = x("UPPER(" + key + ")");
 		operator = "UPPER";
@@ -170,7 +164,9 @@ public class QueryCriteria implements QueryCriteriaDefinition {
 		return this;
 	}
 
-	// upper and lower should work like and/or by pushing "this" to a 'value' and changing "this" to upper()/lower()
+	/**
+	 * upper and lower should work like and/or by pushing "this" to a 'value' and changing "this" to upper()/lower()
+	 */
 	public QueryCriteria lower() {
 		key = x("LOWER(" + key + ")");
 		operator = "LOWER";
@@ -183,14 +179,12 @@ public class QueryCriteria implements QueryCriteriaDefinition {
 	}
 
 	public QueryCriteria or(N1QLExpression key) {
-		// this.criteriaChain.getLast().setChainOperator(ChainOperator.OR);
 		return new QueryCriteria(this.criteriaChain, key, null, ChainOperator.OR);
 	}
 
 	public QueryCriteria or(QueryCriteria criteria) {
-		if (this.criteriaChain != null && !this.criteriaChain.contains(this)) {
-			throw new RuntimeException("criteria chain does not include this");
-		}
+		Assert.isFalse(this.criteriaChain != null && !this.criteriaChain.contains(this),
+				"criteria chain does not include this");
 		if (this.criteriaChain == null) {
 			this.criteriaChain = new LinkedList<>();
 			this.criteriaChain.add(this);
@@ -200,7 +194,7 @@ public class QueryCriteria implements QueryCriteriaDefinition {
 		qc.criteriaChain = newThis.criteriaChain;
 		newThis.criteriaChain.add(qc);
 		qc.setChainOperator(ChainOperator.OR);
-		newThis.chainOperator = ChainOperator.OR;//  otherwise we get "A chain operator must be present when chaining"
+		newThis.chainOperator = ChainOperator.OR;// otherwise we get "A chain operator must be present when chaining"
 		return newThis;
 	}
 
@@ -287,18 +281,13 @@ public class QueryCriteria implements QueryCriteriaDefinition {
 	}
 
 	public QueryCriteria notContaining(@Nullable Object o) {
-		replaceThisAsWrapperOf(containing(o));
-		operator = "NOT";
-		format = "not( %3$s )";
-		return this;
+		return containing(o).negate();
 	}
 
 	public QueryCriteria negate() {
 		replaceThisAsWrapperOf(this);
 		operator = "NOT";
 		format = "not( %3$s )";
-		// criteriaChain = new LinkedList<>();
-		// criteriaChain.add(this);
 		return this;
 	}
 
@@ -317,10 +306,7 @@ public class QueryCriteria implements QueryCriteriaDefinition {
 	}
 
 	public QueryCriteria notLike(@Nullable Object o) {
-		operator = "NOTLIKE";
-		value = new Object[] { o };
-		format = "not(%1$s like %3$s)";
-		return this;
+		return like(o).negate();
 	}
 
 	public QueryCriteria isNull() {
@@ -405,7 +391,7 @@ public class QueryCriteria implements QueryCriteriaDefinition {
 				} else {
 					// see QueryCriteriaTests.testNestedNotIn() - if arg to notIn is not cast to Object
 					// notIn((Object) new String[] { "Alabama", "Florida" }));
-					throw new CouchbaseException("unhandled parameters "+o);
+					throw new CouchbaseException("unhandled parameters " + o);
 				}
 			}
 
@@ -425,10 +411,7 @@ public class QueryCriteria implements QueryCriteriaDefinition {
 	}
 
 	public QueryCriteria FALSE() {
-		value = null;
-		operator = "NOT";
-		format = "not(%1$s)"; // field = 1$, operator = 2$, value=$3, $4, ...
-		return this;
+		return TRUE().negate();
 	}
 
 	/**

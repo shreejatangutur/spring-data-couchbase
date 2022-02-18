@@ -220,7 +220,11 @@ public class N1QLExpression {
 		StringBuilder escaped = new StringBuilder();
 		for (String i : input) {
 			escaped.append(", ");
-			escaped.append(wrapper).append(i).append(wrapper);
+			if (wrapper == '`' && i.startsWith("meta(") || i.startsWith("META(")) {
+				escaped.append(i);
+			} else {
+				escaped.append(wrapper).append(i).append(wrapper);
+			}
 		}
 		if (escaped.length() > 2) {
 			escaped.delete(0, 2);

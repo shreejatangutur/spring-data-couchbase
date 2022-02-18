@@ -19,13 +19,17 @@ import static com.couchbase.client.core.io.CollectionIdentifier.DEFAULT_COLLECTI
 
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
+import com.querydsl.core.types.ExpressionUtils;
+import com.querydsl.core.types.Path;
 import org.springframework.data.couchbase.core.CouchbaseOperations;
 import org.springframework.data.couchbase.core.ExecutableFindByQueryOperation;
+import org.springframework.data.couchbase.core.query.Query;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -52,6 +56,7 @@ public class SpringDataCouchbaseQuery<T> extends SpringDataCouchbaseQuerySupport
 	private final Consumer<BasicQuery> queryCustomizer;
 	private final ExecutableFindByQueryOperation.ExecutableFindByQuery<T> find;// ExecutableFindOperation.FindWithQuery<T>
 																																							// find;
+	private final Class<T> returnType;
 
 	/**
 	 * Creates a new {@link SpringDataCouchbaseQuery}.
@@ -92,6 +97,7 @@ public class SpringDataCouchbaseQuery<T> extends SpringDataCouchbaseQuerySupport
 		this.queryCustomizer = queryCustomizer;
 		this.find = (ExecutableFindByQueryOperation.ExecutableFindByQuery<T>) couchbaseOperations.findByQuery(domainType)
 				.as(resultType1).inCollection(collectionName);
+		this.returnType = resultType1;
 	}
 
 	/*
@@ -238,12 +244,38 @@ public class SpringDataCouchbaseQuery<T> extends SpringDataCouchbaseQuerySupport
 
 	@Override
 	protected Predicate createFilter(QueryMetadata metadata) {
-		return metadata.getWhere();
+			Predicate filter;
+			if (!metadata.getJoins().isEmpty()) {
+				filter = ExpressionUtils.allOf(new Predicate[]{metadata.getWhere(), this.createJoinFilter(metadata)});
+			} else {
+				filter = metadata.getWhere();
+			}
+			return filter;
+	}
+
+	/**
+	 * Fetch the list of ids matching a given condition.
+	 *
+	 * @param targetType must not be {@literal null}.
+	 * @param condition must not be {@literal null}.
+	 * @return empty {@link List} if none found.
+	 */
+	//@Override
+	protected List<Object> getIds(Class<?> targetType, Predicate condition) {
+
+		Query query = createQuery(condition, null, QueryModifiers.EMPTY, Collections.emptyList());
+		List<String> entities = couchbaseOperations.findByQuery(returnType /*targetType*/).distinct(new String[]{"meta().id"}).as(String.class).matching(query).all();
+		List<Object> objs = new LinkedList(entities);
+		return objs;
 	}
 
 	@Override
-	protected List<Object> getIds(Class<?> var1, Predicate var2) {
-		return null;
+	protected List<Object> getIds(Path<?> source, Path<?> target, Predicate condition) {
+		Class<?> targetType = target.getType(); // unused??
+		Query query = createQuery(condition, null, QueryModifiers.EMPTY, Collections.emptyList());
+		List<String> entities = couchbaseOperations.findByQuery(source.getMetadata().getParent().getType() /*targetType*/).distinct(new String[]{target.getMetadata().getName()}).as(String.class).matching(query).all();
+		List<Object> objs = new LinkedList(entities);
+		return objs;
 	}
 
 	protected org.springframework.data.couchbase.core.query.Query createQuery(@Nullable Predicate filter,
@@ -268,27 +300,6 @@ public class SpringDataCouchbaseQuery<T> extends SpringDataCouchbaseQuerySupport
 		return basicQuery;
 	}
 
-	// @Override
-	// protected CouchbaseDocument createQuery(Predicate filter);
-
-	// @Override
-	// protected Map<String,String> createProjection(Expression<?> projection);
-
-	// @Override
-	// protected CouchbaseDocument createSort(List<OrderSpecifier<?>> orderBy);
-
-	/*
-	 * Fetch the list of ids matching a given condition.
-	 *
-	 * @param targetType must not be {@literal null}.
-	 * @param condition must not be {@literal null}.
-	 * @return empty {@link List} if none found.
-	
-	protected List<Object> getIds(Class<?> targetType, Predicate condition) {
-	  Query query = createQuery(condition, null, QueryModifiers.EMPTY, Collections.emptyList());
-	  return couchbaseOperations.findByQuery(targetType).matching(query).all(); //  findDistinct(query, "_id", targetType, Object.class);
-	}
-	 */
 	private static <T> T handleException(RuntimeException e, T defaultValue) {
 
 		if (e.getClass().getName().endsWith("$NoResults")) {

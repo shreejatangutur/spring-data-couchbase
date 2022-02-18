@@ -20,6 +20,7 @@ import static org.springframework.data.couchbase.core.query.N1QLExpression.x;
 import static org.springframework.data.couchbase.core.support.TemplateUtils.SELECT_CAS;
 import static org.springframework.data.couchbase.core.support.TemplateUtils.SELECT_ID;
 
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -187,13 +188,13 @@ public class StringBasedN1qlQueryParser {
 		return new N1qlSpelValues(selectEntity, entity, i(b).toString(), typeSelection, delete, returning);
 	}
 
-	private String getProjectedOrDistinctFields(String b, Class resultClass, String typeField, String[] fields,
+	private String getProjectedOrDistinctFields(String b, Class<?> resultClass, String typeField, String[] fields,
 			String[] distinctFields) {
 		if (distinctFields != null && distinctFields.length != 0) {
 			return i(distinctFields).toString();
 		}
 		String projectedFields = i(b) + ".*";
-		if (resultClass != null) {
+		if (resultClass != null  && !Modifier.isAbstract(resultClass.getModifiers()) /* for both interfaces and abstract classes */) {
 			PersistentEntity persistentEntity = couchbaseConverter.getMappingContext().getPersistentEntity(resultClass);
 			StringBuilder sb = new StringBuilder();
 			getProjectedFieldsInternal(b, null, sb, persistentEntity, typeField, fields, distinctFields != null);

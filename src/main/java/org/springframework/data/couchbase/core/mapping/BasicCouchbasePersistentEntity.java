@@ -165,14 +165,4 @@ public class BasicCouchbasePersistentEntity<T> extends BasicPersistentEntity<T, 
 		return annotation == null ? false : annotation.touchOnRead() && getExpiry() > 0;
 	}
 
-	@Override
-	public boolean hasTextScoreProperty() {
-		return false;
-	}
-
-	@Override
-	public CouchbasePersistentProperty getTextScoreProperty() {
-		return null;
-	}
-
 }

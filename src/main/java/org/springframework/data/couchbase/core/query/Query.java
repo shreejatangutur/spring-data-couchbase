@@ -69,7 +69,7 @@ public class Query {
 		addCriteria(criteriaDefinition);
 	}
 
-	public Query(Query that) {
+	protected Query(Query that) {
 		Assert.notNull(that, "source query cannot be null");
 		this.criteria.addAll(that.criteria);
 		this.parameters = that.parameters;

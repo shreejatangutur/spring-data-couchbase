@@ -61,7 +61,6 @@ public class SpringDataCouchbaseSerializer extends CouchbaseDocumentSerializer {
 
 	private final CouchbaseConverter converter;
 	private final MappingContext<? extends CouchbasePersistentEntity<?>, CouchbasePersistentProperty> mappingContext;
-	// private final QueryMapper mapper;
 
 	/**
 	 * Creates a new {@link SpringDataCouchbaseSerializer} for the given {@link CouchbaseConverter}.
@@ -74,7 +73,6 @@ public class SpringDataCouchbaseSerializer extends CouchbaseDocumentSerializer {
 
 		this.mappingContext = converter.getMappingContext();
 		this.converter = converter;
-		// this.mapper = new QueryMapper(converter);
 	}
 
 	/*
@@ -137,12 +135,13 @@ public class SpringDataCouchbaseSerializer extends CouchbaseDocumentSerializer {
 	 * @see com.querydsl.couchbase.CouchbaseSerializer#asReference(java.lang.Object)
 	 */
 	@Override
-	protected DBRef asReference(@Nullable Object constant) {
+	protected DocRef asReference(@Nullable Object constant) {
 		return asReference(constant, null);
 	}
 
-	protected DBRef asReference(Object constant, Path<?> path) {
-		return null; // converter.toDBRef(constant, getPropertyForPotentialDbRef(path));
+	protected DocRef asReference(Object constant, Path<?> path) {
+		throw new RuntimeException("Not Implemented");
+		//TODO return  convert(constant, getPropertyForPotentialDbRef(path));
 	}
 
 	/*
@@ -177,8 +176,7 @@ public class SpringDataCouchbaseSerializer extends CouchbaseDocumentSerializer {
 	protected Object convert(@Nullable Path<?> path, @Nullable Constant<?> constant) {
 
 		if (!isReference(path)) {
-			return null;
-			// return super.convert(path, constant);
+			return super.convert(path, constant);
 		}
 
 		CouchbasePersistentProperty property = getPropertyFor(path);
@@ -201,8 +199,8 @@ public class SpringDataCouchbaseSerializer extends CouchbaseDocumentSerializer {
 	}
 
 	/**
-	 * Checks the given {@literal path} for referencing the {@literal id} property of a {@link DBRef} referenced object.
-	 * If so it returns the referenced {@link CouchbasePersistentProperty} of the {@link DBRef} instead of the
+	 * Checks the given {@literal path} for referencing the {@literal id} property of a {@link DocRef} referenced object.
+	 * If so it returns the referenced {@link CouchbasePersistentProperty} of the {@link DocRef} instead of the
 	 * {@literal id} property.
 	 *
 	 * @param path

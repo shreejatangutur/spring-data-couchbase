@@ -41,7 +41,7 @@ import com.querydsl.core.annotations.QueryTransient;
  * @author Michael Reiche
  */
 @SupportedAnnotationTypes({ "com.querydsl.core.annotations.*", "org.springframework.data.couchbase.core.mapping.*" })
-@SupportedSourceVersion(SourceVersion.RELEASE_6)
+@SupportedSourceVersion(SourceVersion.RELEASE_8)
 public class CouchbaseAnnotationProcessor extends AbstractQuerydslProcessor {
 
 	/*

@@ -1,0 +1,327 @@
+//
+// Source code recreated from a .class file by IntelliJ IDEA
+// (powered by FernFlower decompiler)
+//
+
+package com.querydsl.couchbase;
+
+import com.mysema.commons.lang.CloseableIterator;
+import com.querydsl.core.DefaultQueryMetadata;
+import com.querydsl.core.Fetchable;
+import com.querydsl.core.JoinExpression;
+import com.querydsl.core.NonUniqueResultException;
+import com.querydsl.core.QueryMetadata;
+import com.querydsl.core.QueryModifiers;
+import com.querydsl.core.QueryResults;
+import com.querydsl.core.SimpleQuery;
+import com.querydsl.core.support.QueryMixin;
+import com.querydsl.core.types.Expression;
+import com.querydsl.core.types.ExpressionUtils;
+import com.querydsl.core.types.FactoryExpression;
+import com.querydsl.core.types.Operation;
+import com.querydsl.core.types.OrderSpecifier;
+import com.querydsl.core.types.ParamExpression;
+import com.querydsl.core.types.Path;
+import com.querydsl.core.types.Predicate;
+import com.querydsl.core.types.dsl.CollectionPathBase;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+
+import com.querydsl.couchbase.document.CouchbaseDocumentSerializer;
+import org.jetbrains.annotations.Nullable;
+import org.springframework.data.couchbase.core.mapping.CouchbaseDocument;
+
+public abstract class AbstractCouchbaseQuery<K, Q extends AbstractCouchbaseQuery<K, Q>> implements SimpleQuery<Q>, Fetchable<K> {
+  private final CouchbaseDocumentSerializer serializer;
+  private final QueryMixin<Q> queryMixin = new QueryMixin(this, new DefaultQueryMetadata(), false);
+  private final Collection collection;
+  private final Function<DBObject, K> transformer;
+
+  public AbstractCouchbaseQuery(Collection collection, Function<DBObject, K> transformer, CouchbaseDocumentSerializer serializer) {
+    this.transformer = transformer;
+    this.collection = collection;
+    this.serializer = serializer;
+  }
+
+  public <T> JoinBuilder<Q, K, T> join(Path<T> ref, Path<T> target) {
+    return new JoinBuilder(this.queryMixin, ref, target);
+  }
+
+  public <T> JoinBuilder<Q, K, T> join(CollectionPathBase<?, T, ?> ref, Path<T> target) {
+    return new JoinBuilder(this.queryMixin, ref, target);
+  }
+
+  public <T> AnyEmbeddedBuilder<Q, K> anyEmbedded(Path<? extends Collection<T>> collection, Path<T> target) {
+    return new AnyEmbeddedBuilder(this.queryMixin, collection);
+  }
+
+  protected abstract com.couchbase.client.java.Collection getCollection(Class<?> var1);
+
+  @Nullable
+  protected Predicate createFilter(QueryMetadata metadata) {
+    Predicate filter;
+    if (!metadata.getJoins().isEmpty()) {
+      filter = ExpressionUtils.allOf(new Predicate[]{metadata.getWhere(), this.createJoinFilter(metadata)});
+    } else {
+      filter = metadata.getWhere();
+    }
+
+    return filter;
+  }
+
+  @Nullable
+  protected Predicate createJoinFilter(QueryMetadata metadata) {
+    Map<Expression<?>, Predicate> predicates = new HashMap();
+    List<JoinExpression> joins = metadata.getJoins();
+
+    for(int i = joins.size() - 1; i >= 0; --i) {
+      JoinExpression join = (JoinExpression)joins.get(i);
+      Path<?> source = (Path)((Operation)join.getTarget()).getArg(0);
+      Path<?> target = (Path)((Operation)join.getTarget()).getArg(1);
+      Predicate extraFilters = (Predicate)predicates.get(target.getRoot());
+      Predicate filter = ExpressionUtils.allOf(new Predicate[]{join.getCondition(), extraFilters});
+      List<? extends Object> ids = this.getIds(target.getType(), filter);
+      if (ids.isEmpty()) {
+        throw new AbstractCouchbaseQuery.NoResults();
+      }
+
+      Path<?> path = ExpressionUtils.path(String.class, source, "$id");
+      predicates.merge(source.getRoot(), ExpressionUtils.in((Expression<Object>)path, ids), ExpressionUtils::and);
+    }
+
+    Path<?> source = (Path)((Operation)((JoinExpression)joins.get(0)).getTarget()).getArg(0);
+    return (Predicate)predicates.get(source.getRoot());
+  }
+/*
+  protected List<Object> getIds(Class<?> targetType, Predicate condition) {
+    Collection collection = this.getCollection(targetType);
+    DBCursor cursor = this.createCursor(collection, condition, (Expression)null, QueryModifiers.EMPTY, Collections.emptyList());
+    if (!cursor.hasNext()) {
+      return Collections.emptyList();
+    } else {
+      List<Object> ids = new ArrayList(cursor.count());
+      Iterator var6 = cursor.iterator();
+
+      while(var6.hasNext()) {
+        DBObject obj = (DBObject)var6.next();
+        ids.add(obj.get("_id"));
+      }
+
+      return ids;
+    }
+  }
+  */
+
+  public Q distinct() {
+    return this.queryMixin.distinct();
+  }
+
+  public Q where(Predicate e) {
+    return this.queryMixin.where(e);
+  }
+
+  public Q where(Predicate... e) {
+    return this.queryMixin.where(e);
+  }
+
+  public Q limit(long limit) {
+    return this.queryMixin.limit(limit);
+  }
+
+  public Q offset(long offset) {
+    return this.queryMixin.offset(offset);
+  }
+
+  public Q restrict(QueryModifiers modifiers) {
+    return this.queryMixin.restrict(modifiers);
+  }
+
+  public Q orderBy(OrderSpecifier<?> o) {
+    return this.queryMixin.orderBy(o);
+  }
+
+  public Q orderBy(OrderSpecifier<?>... o) {
+    return this.queryMixin.orderBy(o);
+  }
+
+  public <T> Q set(ParamExpression<T> param, T value) {
+    return this.queryMixin.set(param, value);
+  }
+
+  public CloseableIterator<K> iterate(Path<?>... paths) {
+    this.queryMixin.setProjection(paths);
+    return this.iterate();
+  }
+
+  public CloseableIterator<K> iterate() {
+    final DBCursor cursor = this.createCursor();
+    return new CloseableIterator<K>() {
+      public boolean hasNext() {
+        return cursor.hasNext();
+      }
+
+      public K next() {
+        return AbstractCouchbaseQuery.this.transformer.apply(cursor.next());
+      }
+
+      public void remove() {
+      }
+
+      public void close() {
+      }
+    };
+  }
+
+  public List<K> fetch(Path<?>... paths) {
+    this.queryMixin.setProjection(paths);
+    return this.fetch();
+  }
+
+  public List<K> fetch() {
+    try {
+      DBCursor cursor = this.createCursor();
+      List<K> results = new ArrayList();
+      Iterator var3 = cursor.iterator();
+
+      while(var3.hasNext()) {
+        DBObject dbObject = (DBObject)var3.next();
+        results.add(this.transformer.apply(dbObject));
+      }
+
+      return results;
+    } catch (AbstractMongodbQuery.NoResults var5) {
+      return Collections.emptyList();
+    }
+  }
+
+  protected DBCursor createCursor() {
+    QueryMetadata metadata = this.queryMixin.getMetadata();
+    Predicate filter = this.createFilter(metadata);
+    return this.createCursor(this.collection, filter, metadata.getProjection(), metadata.getModifiers(), metadata.getOrderBy());
+  }
+
+  protected DBCursor createCursor(DBCollection collection, @Nullable Predicate where, Expression<?> projection, QueryModifiers modifiers, List<OrderSpecifier<?>> orderBy) {
+    DBCursor cursor = collection.find(this.createQuery(where), this.createProjection(projection));
+    Integer limit = modifiers.getLimitAsInteger();
+    Integer offset = modifiers.getOffsetAsInteger();
+    if (limit != null) {
+      cursor.limit(limit);
+    }
+
+    if (offset != null) {
+      cursor.skip(offset);
+    }
+
+    if (orderBy.size() > 0) {
+      cursor.sort(this.serializer.toSort(orderBy));
+    }
+
+    return cursor;
+  }
+
+  private DBObject createProjection(Expression<?> projection) {
+    if (projection instanceof FactoryExpression) {
+      DBObject obj = new CouchbaseDocument();
+      Iterator var3 = ((FactoryExpression)projection).getArgs().iterator();
+
+      while(var3.hasNext()) {
+        Object expr = var3.next();
+        if (expr instanceof Expression) {
+          obj.put((String)this.serializer.handle((Expression)expr), 1);
+        }
+      }
+
+      return obj;
+    } else {
+      return null;
+    }
+  }
+
+  public K fetchFirst(Path<?>... paths) {
+    this.queryMixin.setProjection(paths);
+    return this.fetchFirst();
+  }
+
+  public K fetchFirst() {
+    try {
+      DBCursor c = this.createCursor().limit(1);
+      return c.hasNext() ? this.transformer.apply(c.next()) : null;
+    } catch (AbstractCouchbaseQuery.NoResults var2) {
+      return null;
+    }
+  }
+
+  public K fetchOne(Path<?>... paths) {
+    this.queryMixin.setProjection(paths);
+    return this.fetchOne();
+  }
+
+  public K fetchOne() throws NonUniqueResultException {
+    try {
+      Long limit = this.queryMixin.getMetadata().getModifiers().getLimit();
+      if (limit == null) {
+        limit = 2L;
+      }
+
+      DBCursor c = this.createCursor().limit(limit.intValue());
+      if (c.hasNext()) {
+        K rv = this.transformer.apply(c.next());
+        if (c.hasNext()) {
+          throw new NonUniqueResultException();
+        } else {
+          return rv;
+        }
+      } else {
+        return null;
+      }
+    } catch (AbstractCouchbaseQuery.NoResults var4) {
+      return null;
+    }
+  }
+
+  public QueryResults<K> fetchResults(Path<?>... paths) {
+    this.queryMixin.setProjection(paths);
+    return this.fetchResults();
+  }
+
+  public QueryResults<K> fetchResults() {
+    try {
+      long total = this.fetchCount();
+      return total > 0L ? new QueryResults(this.fetch(), this.queryMixin.getMetadata().getModifiers(), total) : QueryResults.emptyResults();
+    } catch (AbstractCouchbaseQuery.NoResults var3) {
+      return QueryResults.emptyResults();
+    }
+  }
+
+  public long fetchCount() {
+    try {
+      Predicate filter = this.createFilter(this.queryMixin.getMetadata());
+      return this.collection.count(this.createQuery(filter));
+    } catch (AbstractCouchbaseQuery.NoResults var2) {
+      return 0L;
+    }
+  }
+
+  private DBObject createQuery(@Nullable Predicate predicate) {
+    return (DBObject)(predicate != null ? (DBObject)this.serializer.handle(predicate) : new CouchbaseDocument());
+  }
+  
+  public DBObject asDBObject() {
+    return this.createQuery(this.queryMixin.getMetadata().getWhere());
+  }
+
+  public String toString() {
+    return this.asDBObject().toString();
+  }
+
+  private static class NoResults extends RuntimeException {
+    private NoResults() {
+    }
+  }
+}

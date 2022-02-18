@@ -135,7 +135,7 @@ public class ExecutableFindByQueryOperationSupport implements ExecutableFindByQu
 		}
 
 		@Override
-		public FindByQueryWithProjection<T> distinct(final String[] distinctFields) {
+		public FindByQueryWithProjecting<T> distinct(final String[] distinctFields) {
 			Assert.notNull(distinctFields, "distinctFields must not be null");
 			Assert.isNull(fields, "only one of project(fields) and distinct(distinctFields) can be specified");
 			// Coming from an annotation, this cannot be null.

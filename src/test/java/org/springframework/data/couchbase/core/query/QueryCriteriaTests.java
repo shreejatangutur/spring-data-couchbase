@@ -192,7 +192,7 @@ class QueryCriteriaTests {
 	@Test
 	void testNotLike() {
 		QueryCriteria c = where(i("name")).notLike("%Elvis%");
-		assertEquals("not(`name` like \"%Elvis%\")", c.export());
+		assertEquals("not( (`name` like \"%Elvis%\") )", c.export());
 	}
 
 	@Test
@@ -267,7 +267,7 @@ class QueryCriteriaTests {
 	@Test
 	void testFalse() {
 		QueryCriteria c = where(i("name")).FALSE();
-		assertEquals("not(`name`)", c.export());
+		assertEquals("not( (`name`) )", c.export());
 	}
 
 	@Test

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 the original author or authors
+ * Copyright 2022 the original author or authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,20 +24,16 @@ import org.springframework.data.domain.Sort;
 
 import com.querydsl.core.support.QueryMixin;
 import com.querydsl.core.types.OrderSpecifier;
-import com.querydsl.couchbase.document.AbstractCouchbaseQueryDSL;
+import com.querydsl.couchbase.document.AbstractCouchbaseQuery;
 import com.querydsl.couchbase.document.CouchbaseDocumentSerializer;
 
 /**
  * @author Michael Reiche
  */
 abstract class SpringDataCouchbaseQuerySupport<Q extends SpringDataCouchbaseQuerySupport<Q>>
-		extends AbstractCouchbaseQueryDSL<Q> {
+		extends AbstractCouchbaseQuery<Q> {
 
 	private final QueryMixin<Q> superQueryMixin;
-
-	// TODO private static final JsonWriterSettings JSON_WRITER_SETTINGS =
-	// JsonWriterSettings.builder().outputMode(JsonMode.SHELL)
-	// .build();
 
 	private final CouchbaseDocumentSerializer serializer;
 
@@ -65,36 +61,52 @@ abstract class SpringDataCouchbaseQuerySupport<Q extends SpringDataCouchbaseQuer
 	 * find({"lastname" : "Matthews"}).sort({"firstname" : 1}).skip(1).limit(5)
 	 * </pre>
 	 *
-	 * Note that encoding to {@link String} may fail when using data types that cannot be encoded or DBRef's without an
+	 * Note that encoding to {@link String} may fail when using data types that cannot be encoded or DocRef's without an
 	 * identifier.
 	 *
 	 * @return never {@literal null}.
 	 */
 	@Override
 	public String toString() {
-
-		Map<String, String> projection = createProjection(getQueryMixin().getMetadata().getProjection());
-		Sort sort = createSort(getQueryMixin().getMetadata().getOrderBy());
-		// TODO DocumentCodec codec = new DocumentCodec(ClientSettings.getDefaultCodecRegistry());
-
-		// TODO
-		// StringBuilder sb = new StringBuilder("find(" + asDocument().toJson(JSON_WRITER_SETTINGS, codec));
-		StringBuilder sb = new StringBuilder("find(" + asDocument().toString());
-		// if (projection != null && projection.isEmpty()) {
-		// sb.append(", ").append(projection.toJson(JSON_WRITER_SETTINGS, codec));
-		// }
-		sb.append(")");
-		// TODO
-		// if (!sort.isEmpty()) {
-		// sb.append(".sort(").append(sort.toJson(JSON_WRITER_SETTINGS, codec)).append(")");
-		// }
-		if (getQueryMixin().getMetadata().getModifiers().getOffset() != null) {
-			sb.append(".skip(").append(getQueryMixin().getMetadata().getModifiers().getOffset()).append(")");
+		try {
+			Map<String, String> projection = createProjection(getQueryMixin().getMetadata()
+					.getProjection());
+			Sort sort = createSort(getQueryMixin().getMetadata()
+					.getOrderBy());
+			StringBuilder sb = new StringBuilder("find(" + asDocument().toString());
+			if (projection != null && projection.isEmpty()) {
+				sb.append(", ")
+						.append(projection);
+			}
+			sb.append(")");
+			if (sort != null && !sort.isEmpty()) {
+				sb.append(".sort(")
+						.append(sort)
+						.append(")");
+			}
+			if (getQueryMixin().getMetadata()
+					.getModifiers()
+					.getOffset() != null) {
+				sb.append(".skip(")
+						.append(getQueryMixin().getMetadata()
+								.getModifiers()
+								.getOffset())
+						.append(")");
+			}
+			if (getQueryMixin().getMetadata()
+					.getModifiers()
+					.getLimit() != null) {
+				sb.append(".limit(")
+						.append(getQueryMixin().getMetadata()
+								.getModifiers()
+								.getLimit())
+						.append(")");
+			}
+			return sb.toString();
+		} catch (Exception e){
+			e.printStackTrace();
+			return e.toString();
 		}
-		if (getQueryMixin().getMetadata().getModifiers().getLimit() != null) {
-			sb.append(".limit(").append(getQueryMixin().getMetadata().getModifiers().getLimit()).append(")");
-		}
-		return sb.toString();
 	}
 
 	/**
@@ -105,20 +117,6 @@ abstract class SpringDataCouchbaseQuerySupport<Q extends SpringDataCouchbaseQuer
 	public CouchbaseDocument asDocument() {
 		return createQuery(getQueryMixin().getMetadata().getWhere());
 	}
-
-	/**
-	 * Obtain the json query representation.
-	 *
-	 * @return never {@literal null}. public String toJson() { return toJson(JSON_WRITER_SETTINGS); }
-	 */
-
-	/**
-	 * Obtain the json query representation applying given {@link JsonWriterSettings settings}.
-	 *
-	 * @param settings must not be {@literal null}.
-	 * @return never {@literal null}. public String toJson(JsonWriterSettings settings) { return
-	 *         asDocument().toJson(settings); }
-	 */
 
 	/**
 	 * Compute the sort {@link CouchbaseDocument} from the given list of {@link OrderSpecifier order specifiers}.
