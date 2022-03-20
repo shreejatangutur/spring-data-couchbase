@@ -10,4 +10,4 @@ cache:
 script:
   - java --version
   - ./mvnw clean install
-  - ./mvnw test
+  - ./mvnw test -Dtest=org.springframework.data.couchbase.core.mapping.MappingCouchbaseConverterTests#idHasMultiplePrefixesAndSuffixesSameOrder
